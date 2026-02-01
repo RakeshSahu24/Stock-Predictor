@@ -7,8 +7,14 @@ import traceback
 import tensorflow as tf
 import streamlit as st
 from sklearn.preprocessing import MinMaxScaler
+from datetime import datetime, timedelta 
 
-MODEL_PATH = r'd:\Python\Stock\Stock_Predictions_Model.keras'
+# ---------------------- Local Host ----------------------
+# MODEL_PATH = r'd:\Python\Stock\Stock_Predictions_Model.keras'
+
+# ---------------------- STREAMLIT CONFIG ----------------------
+MODEL_PATH = "Stock_Predictions_Model.keras"
+ 
 
 # ---------------------- PAGE CONFIG ----------------------
 st.set_page_config(
@@ -103,22 +109,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------- MODEL LOADING ----------------------
-model = None
-try:
-    if not os.path.exists(MODEL_PATH):
-        st.error(f"🚫 Model file not found at: {MODEL_PATH}")
-        st.stop()
+@st.cache_resource
+def load_lstm_model(path):
+    return tf.keras.models.load_model(path, compile=False)
 
-    try:
-        model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-    except Exception:
-        from keras.models import load_model as _km
-        model = _km(MODEL_PATH)
-except Exception as exc:
-    tb = traceback.format_exc()
-    st.error("❌ Failed to load the Keras model.")
-    st.code(tb)
+if not os.path.exists(MODEL_PATH):
+    st.error(f"🚫 Model file not found at: {MODEL_PATH}")
     st.stop()
+
+model = load_lstm_model(MODEL_PATH)
 
 # ---------------------- HEADER ----------------------
 st.markdown("""
@@ -180,7 +179,14 @@ with st.sidebar:
 with st.spinner('🔄 Fetching stock data...'):
     try:
         if data_mode == "📊 Analysis":
-            data = yf.download(stock, start="2015-04-01", end="2025-04-01", progress=False)
+            end_date = datetime.now().date() - timedelta(days=1)  # yesterday
+            start_date = end_date - timedelta(days=365 * 10)  # approx. 10 years ago
+            data = yf.download(
+                stock,
+                start=start_date.strftime('%Y-%m-%d'),
+                end=end_date.strftime('%Y-%m-%d'),
+                progress=False
+            )
         else:
             data = yf.download(stock, period="2y", interval="1d", progress=False)
 
@@ -250,7 +256,7 @@ st.markdown(f"""
 
 # ---------------------- DATA VIEW ----------------------
 with st.expander("📋 View Raw Stock Data"):
-    st.dataframe(data, use_container_width=True)
+    st.dataframe(data.tail(500), use_container_width=True)
 
 # ---------------------- PREPROCESSING ----------------------
 data_train = pd.DataFrame(data.Close[0:int(len(data) * 0.80)])
@@ -274,82 +280,88 @@ if data_mode == "📊 Analysis":
     
     with tab1:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig1 = plt.figure(figsize=(12, 6))
-        plt.plot(ma_50_days, 'r', label='MA50', linewidth=2)
-        plt.plot(data.Close, 'g', label='Stock Price', linewidth=1.5, alpha=0.7)
-        plt.title('Stock Price vs 50-Day Moving Average', fontsize=14, fontweight='bold')
-        plt.xlabel('Date', fontsize=12)
-        plt.ylabel('Price', fontsize=12)
-        plt.legend(fontsize=10)
-        plt.grid(True, alpha=0.3)
-        st.pyplot(fig1)
+        fig1 ,ax = plt.subplots(figsize=(12, 6))
+        ax.plot(ma_50_days, 'r', label='MA50', linewidth=2)
+        ax.plot(data.Close, 'g', label='Stock Price', linewidth=1.5, alpha=0.7)
+        ax.set_title('Stock Price vs 50-Day Moving Average', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Date', fontsize=12)
+        ax.set_ylabel('Price', fontsize=12)
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+        st.pyplot(fig1,clear_figure=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab2:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig2 = plt.figure(figsize=(12, 6))
-        plt.plot(ma_50_days, 'r', label='MA50', linewidth=2)
-        plt.plot(ma_100_days, 'b', label='MA100', linewidth=2)
-        plt.plot(data.Close, 'g', label='Stock Price', linewidth=1.5, alpha=0.7)
-        plt.title('Stock Price vs MA50 vs MA100', fontsize=14, fontweight='bold')
-        plt.xlabel('Date', fontsize=12)
-        plt.ylabel('Price', fontsize=12)
-        plt.legend(fontsize=10)
-        plt.grid(True, alpha=0.3)
-        st.pyplot(fig2)
+        fig2 ,ax = plt.subplots(figsize=(12, 6))
+        ax.plot(ma_50_days, 'r', label='MA50', linewidth=2)
+        ax.plot(ma_100_days, 'b', label='MA100', linewidth=2)
+        ax.plot(data.Close, 'g', label='Stock Price', linewidth=1.5, alpha=0.7)
+        ax.set_title('Stock Price vs MA50 vs MA100', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Date', fontsize=12)
+        ax.set_ylabel('Price', fontsize=12)
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+        st.pyplot(fig2,clear_figure=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab3:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig3 = plt.figure(figsize=(12, 6))
-        plt.plot(ma_100_days, 'r', label='MA100', linewidth=2)
-        plt.plot(ma_200_days, 'b', label='MA200', linewidth=2)
-        plt.plot(data.Close, 'g', label='Stock Price', linewidth=1.5, alpha=0.7)
-        plt.title('Stock Price vs MA100 vs MA200', fontsize=14, fontweight='bold')
-        plt.xlabel('Date', fontsize=12)
-        plt.ylabel('Price', fontsize=12)
-        plt.legend(fontsize=10)
-        plt.grid(True, alpha=0.3)
-        st.pyplot(fig3)
+        fig3 ,ax = plt.subplots(figsize=(12, 6))
+        ax.plot(ma_100_days, 'r', label='MA100', linewidth=2)
+        ax.plot(ma_200_days, 'b', label='MA200', linewidth=2)
+        ax.plot(data.Close, 'g', label='Stock Price', linewidth=1.5, alpha=0.7)
+        ax.set_title('Stock Price vs MA100 vs MA200', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Date', fontsize=12)
+        ax.set_ylabel('Price', fontsize=12)
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+        st.pyplot(fig3,clear_figure=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab4:
-        # Model predictions
-        x, y = [], []
-        for i in range(100, data_test_scale.shape[0]):
-            x.append(data_test_scale[i - 100:i])
-            y.append(data_test_scale[i, 0])
 
-        x, y = np.array(x), np.array(y)
-        predict = model.predict(x, verbose=0)
-        scale = 1 / scaler.scale_
-        predict = predict * scale
-        y = y * scale
+        if st.button("🚀 Run Model Performance"):
 
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        fig4 = plt.figure(figsize=(12, 6))
-        plt.plot(predict, 'r', label='Predicted Price', linewidth=2)
-        plt.plot(y, 'g', label='Actual Price', linewidth=2)
-        plt.title('Model Performance: Predicted vs Actual Price', fontsize=14, fontweight='bold')
-        plt.xlabel('Time Period', fontsize=12)
-        plt.ylabel('Price', fontsize=12)
-        plt.legend(fontsize=10)
-        plt.grid(True, alpha=0.3)
-        st.pyplot(fig4)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Calculate accuracy metrics
-        mse = np.mean((predict.flatten() - y) ** 2)
-        rmse = np.sqrt(mse)
-        mae = np.mean(np.abs(predict.flatten() - y))
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Mean Squared Error", f"{mse:,.2f}")
-        with col2:
-            st.metric("Root Mean Squared Error", f"{rmse:,.2f}")
-        with col3:
-            st.metric("Mean Absolute Error", f"{mae:,.2f}")
+            # Prepare sequences
+            x, y = [], []
+            for i in range(100, data_test_scale.shape[0]):
+                x.append(data_test_scale[i - 100:i])
+                y.append(data_test_scale[i, 0])
+
+            x, y = np.array(x), np.array(y)
+
+            # Model prediction
+            predict = model.predict(x, verbose=0)
+
+            # Rescale
+            scale = 1 / scaler.scale_
+            predict = predict * scale
+            y = y * scale
+
+            # Plot
+            fig4, ax = plt.subplots(figsize=(12, 6))
+            ax.plot(predict, label='Predicted Price')
+            ax.plot(y, label='Actual Price')
+            ax.set_title('Model Performance: Predicted vs Actual Price')
+            ax.legend()
+            ax.grid(True)
+
+            st.pyplot(fig4, clear_figure=True)
+
+            # Metrics
+            mse = np.mean((predict.flatten() - y) ** 2)
+            rmse = np.sqrt(mse)
+            mae = np.mean(np.abs(predict.flatten() - y))
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Mean Squared Error", f"{mse:,.2f}")
+            with col2:
+                st.metric("Root Mean Squared Error", f"{rmse:,.2f}")
+            with col3:
+                st.metric("Mean Absolute Error", f"{mae:,.2f}")
+
 
 # ---------------------- PREDICTION MODE ----------------------
 else:
