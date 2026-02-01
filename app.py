@@ -8,8 +8,9 @@ import tensorflow as tf
 import streamlit as st
 from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime, timedelta 
+from yfinance import Search
 
-# ---------------------- Local Host ----------------------
+# ---------------------- CONSTANTS ----------------------
 # MODEL_PATH = r'd:\Python\Stock\Stock_Predictions_Model.keras'
 
 # ---------------------- STREAMLIT CONFIG ----------------------
@@ -149,8 +150,38 @@ with st.sidebar:
         stock = st.selectbox('Select stock', stock_symbols)
         stock = stock.split(' ')[0]
     else:
-        user_input = st.text_input('Enter Stock Symbol', placeholder='e.g., TATASTEEL.NS or AAPL')
-        stock = user_input.strip().upper()
+        from yfinance import Search
+        user_input = st.text_input(
+            "Enter Company Name or Symbol",
+            placeholder="e.g., Apple, Reliance, TCS",
+            key="search_box"
+        )
+
+        stock = None
+
+        if user_input:
+            with st.spinner("🔍 Searching stocks..."):
+                search = Search(user_input)
+                results = search.quotes
+
+            if results:
+                suggestions = []
+
+                for item in results:
+                    symbol = item.get("symbol", "")
+                    name = item.get("shortname", "")
+                    exchange = item.get("exchange", "")
+
+                    if item.get("quoteType") == "EQUITY":
+                        suggestions.append(f"{symbol} - {name} ({exchange})")
+
+                if suggestions:
+                    selected = st.selectbox("Select Stock", suggestions)
+                    stock = selected.split(" - ")[0]
+                else:
+                    st.warning("No stock equities found.")
+            else:
+                st.warning("No matching stocks found.")
 
     if not stock:
         st.error("⚠️ Please provide a stock symbol.")
@@ -211,7 +242,19 @@ prev_close = float(data['Close'].iloc[-2])  # Convert to float
 price_change = last_close - prev_close
 price_change_pct = (price_change / prev_close) * 100
 
-currency_symbol = "₹" if stock.endswith(".NS") else "$"
+currency_symbol = ""
+ticker = yf.Ticker(stock)
+info = ticker.fast_info
+
+currency = info.get("currency", "USD")
+
+if currency == "INR":
+    currency_symbol = "₹"
+elif currency == "USD":
+    currency_symbol = "$"
+else:
+    currency_symbol = currency
+
 
 col1, col2, col3, col4 = st.columns(4)
 
